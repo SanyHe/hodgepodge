@@ -42,15 +42,21 @@ def real_depth(strat_data, basic_data):
 
     :param strat_data: 名为分层信息的数据集
     :param basic_data: 名为基本信息的数据集
-    :return: 含有实际层顶埋深、实际层底埋深、孔口高程的数据集（原数据集为分层信息的数据集）
+    :return: 含有实际层顶埋深、实际层底埋深、孔口高程、x坐标、y坐标的数据集（原数据集为分层信息的数据集）
     """
     orifice_elev = []
+    x_coordinate = []
+    y_coordinate = []
     basic_data["孔口高程"] = basic_data["孔口高程"].fillna(0)
     for i in range(strat_data.shape[0]):
         for j in range(basic_data.shape[0]):
             if strat_data["钻孔编号"].iloc[i] == basic_data["钻孔编号"].iloc[j]:
                 orifice_elev.append(basic_data["孔口高程"].iloc[j])
+                x_coordinate.append(basic_data["X坐标"].iloc[j])
+                y_coordinate.append(basic_data["Y坐标"].iloc[j])
     strat_data.loc[:, "孔口高程"] = np.array(orifice_elev).reshape(-1, 1)
+    strat_data.loc[:, "X坐标"] = np.array(x_coordinate).reshape(-1, 1)
+    strat_data.loc[:, "Y坐标"] = np.array(y_coordinate).reshape(-1, 1)
     strat_data.loc[:, "实际层顶埋深"] = strat_data["孔口高程"] - strat_data["层顶埋深"]
     strat_data.loc[:, "实际层底埋深"] = strat_data["孔口高程"] - strat_data["层底埋深"]
     return strat_data
@@ -99,7 +105,7 @@ def main():
     # 筛选出实际的砂层数据
     data_extracted = extract(strat_data)
 
-    # 计算实际层顶埋深和实际层底埋深，将前两者和孔口高程附加在表后
+    # 计算实际层顶埋深和实际层底埋深，将前两者、孔口高程、xy坐标附加在表后
     data_real = real_depth(data_extracted, basic_data)
 
     # 按照指定的范围进一步筛选数据
