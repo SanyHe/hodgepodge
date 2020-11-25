@@ -11,10 +11,10 @@ RANGE_LEFT = -30
 RANGE_RIGHT = -15
 
 def is_sand(single_data):
-    """判断数据点是否为黏土
+    """判断数据点是否为淤泥
 
     :param single_data: 单个数据点
-    :return: 布尔值，真，则该数据点为黏土，假，则该数据点不为黏土
+    :return: 布尔值，真，则该数据点为淤泥，假，则该数据点不为淤泥
     """
     global KEY_WORD
 
@@ -23,10 +23,10 @@ def is_sand(single_data):
     return flag
 
 def extract(data):
-    """筛选出岩性为黏土的数据
+    """筛选出岩性为淤泥的数据
 
     :param data: 待筛选的数据集
-    :return: 岩石为黏土的数据集
+    :return: 岩石为淤泥的数据集
     """
     flag = data['岩石名称'].map(is_sand)
     return data[flag]
@@ -36,15 +36,21 @@ def real_depth(strat_data, basic_data):
 
     :param strat_data: 名为分层信息的数据集
     :param basic_data: 名为基本信息的数据集
-    :return: 含有实际层顶埋深、实际层底埋深、孔口高程的数据集（原数据集为分层信息的数据集）
+    :return: 含有实际层顶埋深、实际层底埋深、孔口高程、xy坐标的数据集（原数据集为分层信息的数据集）
     """
     orifice_elev = []
+    x_coordinate = []
+    y_coordinate = []
     basic_data["孔口高程"] = basic_data["孔口高程"].fillna(0)
     for i in range(strat_data.shape[0]):
         for j in range(basic_data.shape[0]):
             if strat_data["钻孔编号"].iloc[i] == basic_data["钻孔编号"].iloc[j]:
                 orifice_elev.append(basic_data["孔口高程"].iloc[j])
+                x_coordinate.append(basic_data["X坐标"].iloc[j])
+                y_coordinate.append(basic_data["Y坐标"].iloc[j])
     strat_data.loc[:, "孔口高程"] = np.array(orifice_elev).reshape(-1, 1)
+    strat_data.loc[:, "X坐标"] = np.array(x_coordinate).reshape(-1, 1)
+    strat_data.loc[:, "Y坐标"] = np.array(y_coordinate).reshape(-1, 1)
     strat_data.loc[:, "实际层顶埋深"] = strat_data["孔口高程"] - strat_data["层顶埋深"]
     strat_data.loc[:, "实际层底埋深"] = strat_data["孔口高程"] - strat_data["层底埋深"]
     return strat_data
@@ -90,17 +96,17 @@ def main():
     strat_data = pd.read_excel("分层信息.xlsx")
     basic_data = pd.read_excel("基本信息.xlsx")
 
-    # 筛选出实际的黏土层数据
+    # 筛选出实际的淤泥层数据
     data_extracted = extract(strat_data)
 
-    # 计算实际层顶埋深和实际层底埋深，将前两者和孔口高程附加在表后
+    # 计算实际层顶埋深和实际层底埋深，将前两者和孔口高程，xy坐标附加在表后
     data_real = real_depth(data_extracted, basic_data)
 
     # 按照指定的范围进一步筛选数据
     data_range = range_filter(data_real)
 
     # 将数据以excel表格的形式输出
-    df2excel(data_range, "黏土")
+    df2excel(data_range, "淤泥")
 
     end = time.time()
     print("RUN SUCCESSFULLY")
