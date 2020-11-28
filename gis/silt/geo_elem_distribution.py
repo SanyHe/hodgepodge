@@ -1,91 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# Created by 何灿 Sany 2020/11/21
 
-import numpy as np
+from my_gis_toolkit import *
 import pandas as pd
 import time
-import re
-
-KEY_WORD = "淤泥"
-RANGE_LEFT = -30
-RANGE_RIGHT = -15
-
-def is_sand(single_data):
-    """判断数据点是否为淤泥
-
-    :param single_data: 单个数据点
-    :return: 布尔值，真，则该数据点为淤泥，假，则该数据点不为淤泥
-    """
-    global KEY_WORD
-
-    ismatch1 = re.search(KEY_WORD, single_data)
-    flag = True if ismatch1 is not None else False
-    return flag
-
-def extract(data):
-    """筛选出岩性为淤泥的数据
-
-    :param data: 待筛选的数据集
-    :return: 岩石为淤泥的数据集
-    """
-    flag = data['岩石名称'].map(is_sand)
-    return data[flag]
-
-def real_depth(strat_data, basic_data):
-    """计算实际层顶埋深和实际层底埋深
-
-    :param strat_data: 名为分层信息的数据集
-    :param basic_data: 名为基本信息的数据集
-    :return: 含有实际层顶埋深、实际层底埋深、孔口高程、xy坐标的数据集（原数据集为分层信息的数据集）
-    """
-    orifice_elev = []
-    x_coordinate = []
-    y_coordinate = []
-    basic_data["孔口高程"] = basic_data["孔口高程"].fillna(0)
-    for i in range(strat_data.shape[0]):
-        for j in range(basic_data.shape[0]):
-            if strat_data["钻孔编号"].iloc[i] == basic_data["钻孔编号"].iloc[j]:
-                orifice_elev.append(basic_data["孔口高程"].iloc[j])
-                x_coordinate.append(basic_data["X坐标"].iloc[j])
-                y_coordinate.append(basic_data["Y坐标"].iloc[j])
-    strat_data.loc[:, "孔口高程"] = np.array(orifice_elev).reshape(-1, 1)
-    strat_data.loc[:, "X坐标"] = np.array(x_coordinate).reshape(-1, 1)
-    strat_data.loc[:, "Y坐标"] = np.array(y_coordinate).reshape(-1, 1)
-    strat_data.loc[:, "实际层顶埋深"] = strat_data["孔口高程"] - strat_data["层顶埋深"]
-    strat_data.loc[:, "实际层底埋深"] = strat_data["孔口高程"] - strat_data["层底埋深"]
-    return strat_data
-
-def range_filter(data):
-    """筛选出指定范围内的数据
-
-    :param data: 含有实际层顶埋深和实际层底埋深数据的待筛选的数据集
-    :return: 在指定范围内的数据集
-    """
-    global RANGE_LEFT, RANGE_RIGHT
-
-    flag1 = data["实际层顶埋深"].map(lambda x: RANGE_LEFT <= x <= RANGE_RIGHT)
-    flag2 = data["实际层底埋深"].map(lambda x: RANGE_LEFT <= x <= RANGE_RIGHT)
-    flag = flag1.copy()
-    for i in range(flag1.shape[0]):
-        if (flag1.iloc[i] == True) and (flag2.iloc[i] == True):
-            flag.iloc[i] = True
-        else:
-            flag.iloc[i] = False
-    return data[flag]
-
-def df2excel(data, sheet_name):
-    """以xlsx的格式导出数据集
-
-    :param data: 待导出的数据集
-    :param sheet_name: 表格名
-    """
-    writer = pd.ExcelWriter(sheet_name + ".xlsx")
-    data.to_excel(writer)
-    writer.save()
-
 
 def main():
-
     start = time.time()
     print("-"*20, "RUNNING", "-"*20)
 
@@ -96,17 +17,24 @@ def main():
     strat_data = pd.read_excel("分层信息.xlsx")
     basic_data = pd.read_excel("基本信息.xlsx")
 
-    # 筛选出实际的淤泥层数据
+    # 筛选出实际的砂层数据
     data_extracted = extract(strat_data)
 
-    # 计算实际层顶埋深和实际层底埋深，将前两者和孔口高程，xy坐标附加在表后
+    # 计算实际层顶埋深和实际层底埋深，将前两者、孔口高程、xy坐标附加在表后
     data_real = real_depth(data_extracted, basic_data)
 
     # 按照指定的范围进一步筛选数据
-    data_range = range_filter(data_real)
+    data_filtered = range_filter(data_real)
 
-    # 将数据以excel表格的形式输出
-    df2excel(data_range, "淤泥")
+    # 算出各钻孔指定范围内砂层的累计厚度，并将累计厚度附在表后
+    data_thick = merge_thickness(data_filtered, basic_data)
+
+    # 以1和0区分有累计厚度和无厚度两类，并将标签附在表后
+    data_thick_type = is_thick(data_thick)
+
+    # 将数据以excel表格的形式输出，"砂层"是各钻孔多层砂岩的详细数据，"arcgis_data"是用于arcgis处理的数据
+    df2excel(data_filtered, "淤泥")
+    df2excel(data_thick_type, "arcgis_data")
 
     end = time.time()
     print("RUN SUCCESSFULLY")
@@ -115,3 +43,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+
